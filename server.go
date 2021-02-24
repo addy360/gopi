@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 )
 
 type Post struct {
@@ -24,6 +27,7 @@ type haha string
 func main() {
 	postHandler := newPost()
 	http.HandleFunc("/posts", postHandler.postController)
+	http.HandleFunc("/post/", postHandler.getPost)
 
 	err := http.ListenAndServe(":8989", nil)
 	if err != nil {
@@ -59,6 +63,7 @@ func (h *postHandlers) post(w http.ResponseWriter, r *http.Request) {
 	var post Post
 	err = json.Unmarshal(bs, &post)
 	h.Lock()
+	post.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	h.store[post.ID] = post
 	defer h.Unlock()
 	w.Write([]byte("Success"))
@@ -75,6 +80,29 @@ func (h *postHandlers) get(w http.ResponseWriter, r *http.Request) {
 	h.Unlock()
 
 	postBs, err := json.Marshal(posts)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	w.Write(postBs)
+}
+
+func (h *postHandlers) getPost(w http.ResponseWriter, r *http.Request) {
+	var post interface{}
+	id := strings.Split(r.URL.Path, "/")[2]
+	log.Println(id)
+	i := 0
+	h.Lock()
+	for _, v := range h.store {
+		if v.ID == strings.TrimSpace(id) {
+			post = v
+		}
+		i++
+	}
+	h.Unlock()
+
+	postBs, err := json.Marshal(post)
 
 	if err != nil {
 		log.Panic(err)
